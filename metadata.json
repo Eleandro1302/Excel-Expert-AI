@@ -1,0 +1,7 @@
+{
+  "name": "Excel Expert AI",
+  "description": "An AI-powered assistant that provides expert answers to your Excel questions. Get clear, practical, and complete solutions, from simple formulas to advanced VBA macros, powered by Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

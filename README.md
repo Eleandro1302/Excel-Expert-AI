@@ -1,22 +1,20 @@
-# Excel Expert AI
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-## Índice
+# Run and deploy your AI Studio app
 
-1. [Sobre o Projeto](#sobre-o-projeto)
-2. [Tecnologias Utilizadas](#tecnologias-utilizadas)
-3. [Criado por](#criado-por)
+This contains everything you need to run your app locally.
 
-## Sobre o Projeto
+View your app in AI Studio: https://ai.studio/apps/drive/1tvJujgRQhQp1C9lt0Qzq1LzPA0Xi7Xgj
 
-O **Excel Expert AI** é um assistente avançado desenvolvido para ajudar usuários de todos os níveis a criar planilhas, elaborar fórmulas, esclarecer dúvidas e realizar qualquer outra tarefa relacionada ao Excel. Desde conceitos básicos até técnicas avançadas, o projeto oferece uma solução abrangente para maximizar a eficiência e produtividade no uso de planilhas.
+## Run Locally
 
-## Tecnologias Utilizadas
+**Prerequisites:**  Node.js
 
-- **Python**: Para desenvolvimento de scripts e lógica do projeto.
-- **Pandas**: Para manipulação e análise de dados.
-- **NumPy**: Para cálculos numéricos avançados.
-- **OpenAI API**: Para integração de inteligência artificial.
 
-## Criado por
-
-Este projeto foi criado por [Eleandro Mangrich](https://www.linkedin.com/in/eleandro-mangrich). Para mais informações, sinta-se à vontade para entrar em contato pelo LinkedIn.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
