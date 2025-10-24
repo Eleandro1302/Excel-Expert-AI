@@ -8,11 +8,9 @@
 
 ## Sobre o Projeto
 
-Descreva aqui sobre o propósito e funcionalidades do projeto Excel Expert AI.
+O **Excel Expert AI** é um assistente avançado desenvolvido para ajudar usuários de todos os níveis a criar planilhas, elaborar fórmulas, esclarecer dúvidas e realizar qualquer outra tarefa relacionada ao Excel. Desde conceitos básicos até técnicas avançadas, o projeto oferece uma solução abrangente para maximizar a eficiência e produtividade no uso de planilhas.
 
 ## Tecnologias Utilizadas
-
-Liste aqui as tecnologias e ferramentas usadas no projeto, por exemplo:
 
 - **Python**: Para desenvolvimento de scripts e lógica do projeto.
 - **Pandas**: Para manipulação e análise de dados.
