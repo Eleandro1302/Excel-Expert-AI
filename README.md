@@ -30,50 +30,30 @@ An AI-powered assistant that provides expert answers to your Excel questions. Ge
 
 ## 🚀 Getting Started
 
-This project is configured to run directly in the browser without a build step, thanks to `importmap`. However, to handle the API key securely, a local development server with environment variable support is required.
+This project is designed to run directly in any modern web browser without any installation or build steps.
 
 ### Prerequisites
 
 -   A modern web browser (Chrome, Firefox, Safari, Edge).
--   A Google Gemini API Key. You can get one from [Google AI Studio](https://aistudio.google.com/app/apikey).
+-   A Google Gemini API Key. You can get one for free from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-### Local Development Setup
+### How to Use
 
-The Gemini API calls will fail without an API key. Follow these steps for a proper local setup:
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/excel-expert-ai.git
-    cd excel-expert-ai
-    ```
-
-2.  **Create an environment file:**
-    This project expects the API key to be available as a global environment variable. For local development with a tool like [Vite](https://vitejs.dev/), you can create a file named `.env.local` in the root of the project:
-    ```
-    VITE_API_KEY=YOUR_GEMINI_API_KEY_HERE
-    ```
-    *Note: You will need to adjust `services/geminiService.ts` to read the key from `import.meta.env.VITE_API_KEY` instead of `process.env.API_KEY` for this setup to work with Vite.*
-
-3.  **Install a development server (e.g., Vite):**
-    ```bash
-    npm install -g vite
-    ```
-
-4.  **Run the development server:**
-    ```bash
-    vite
-    ```
-    Vite will start a local server and inject the environment variables, allowing the application to access your API key. Open the URL provided in your terminal.
+1.  Open the `index.html` file in your browser, or visit the deployed application link.
+2.  When you first launch the app, a pop-up will ask you to enter your Gemini API key.
+3.  Paste your key into the input field and click "Save and Continue".
+4.  That's it! You can now start asking questions. Your key is saved in your browser's local storage for future visits. You can change it at any time using the "Manage API Key" button in the sidebar.
 
 ## ⚙️ How It Works
 
 -   **Frontend**: The user interface is a single-page application built with React components, managing state for conversations, loading status, and user input.
+-   **API Key Management**: The app prompts the user for a Gemini API key on first use and stores it securely in the browser's `localStorage`. This allows the app to be fully client-side and hosted on any static platform.
 -   **Gemini Service (`services/geminiService.ts`)**: This is the core of the AI interaction.
-    -   It initializes the Google Gemini AI client.
+    -   It initializes the Google Gemini AI client using the stored API key.
     -   It includes a detailed **system instruction** that primes the model to act as an experienced Excel expert in Portuguese, ensuring consistent and high-quality responses.
     -   It handles streaming chat responses for a real-time feel.
 -   **File Handling**: When a user uploads a spreadsheet, the `xlsx` library parses it on the client-side. The content is converted to CSV format and prepended to the user's prompt, giving the AI context for the query.
--   **State & History**: The `App.tsx` component manages the application's state. All conversations are stored in the browser's `localStorage`, allowing sessions to be persisted.
+-   **State & History**: The `App.tsx` component manages the application's state. All conversations are also stored in the browser's `localStorage`, allowing sessions to be persisted.
 
 ## 📄 License
 

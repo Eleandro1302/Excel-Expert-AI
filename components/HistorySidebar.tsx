@@ -1,7 +1,7 @@
 
-import React, 'react';
+import React from 'react';
 import { Conversation } from '../types';
-import { PlusIcon, MessageSquareIcon, TrashIcon, ExcelIcon } from './IconComponents';
+import { PlusIcon, MessageSquareIcon, TrashIcon, ExcelIcon, SettingsIcon } from './IconComponents';
 
 interface HistorySidebarProps {
   conversations: Conversation[];
@@ -11,6 +11,7 @@ interface HistorySidebarProps {
   onNewChat: () => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  onManageApiKey: () => void;
 }
 
 interface ConfirmationModalProps {
@@ -66,7 +67,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
   onDeleteConversation,
   onNewChat,
   isOpen,
-  setIsOpen
+  setIsOpen,
+  onManageApiKey
 }) => {
   const [conversationToDelete, setConversationToDelete] = React.useState<Conversation | null>(null);
     
@@ -141,6 +143,16 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                     </div>
                 )}
             </nav>
+
+            <div className="p-2 border-t border-gray-700/50 mt-auto flex-shrink-0">
+                <button 
+                    onClick={onManageApiKey} 
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:bg-gray-700/50 hover:text-gray-200 rounded-md transition-colors"
+                >
+                    <SettingsIcon className="h-4 w-4" />
+                    <span>Manage API Key</span>
+                </button>
+            </div>
         </aside>
 
         <ConfirmationModal

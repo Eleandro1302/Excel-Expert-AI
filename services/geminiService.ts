@@ -2,18 +2,38 @@ import { GoogleGenAI, Chat, ChatMessage as GeminiChatMessage } from "@google/gen
 import { ChatMessage, ChatRole } from "../types";
 
 let ai: GoogleGenAI | null = null;
+let currentApiKey: string | null = null;
 
 /**
- * Lazily initializes and returns the GoogleGenAI instance.
- * This prevents the app from crashing on startup if the API key is not immediately available.
+ * Retrieves the API key from the browser's local storage.
+ */
+const getApiKey = (): string | null => {
+    try {
+        return localStorage.getItem('gemini-api-key');
+    } catch (e) {
+        console.error("Could not access localStorage to get API key", e);
+        return null;
+    }
+};
+
+
+/**
+ * Initializes and returns the GoogleGenAI instance using the key from local storage.
+ * It re-initializes the client if the API key has changed.
+ * This prevents the app from crashing and allows the key to be set by the user.
  */
 const getAi = (): GoogleGenAI => {
-    if (!ai) {
-        if (!process.env.API_KEY) {
-            throw new Error("API_KEY environment variable is not set. Please make sure it's configured.");
-        }
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("Gemini API key not found in your browser's local storage. Please set it via the 'Manage API Key' button.");
     }
+    
+    // Re-initialize if the key has changed since last time
+    if (!ai || currentApiKey !== apiKey) {
+        currentApiKey = apiKey;
+        ai = new GoogleGenAI({ apiKey: currentApiKey });
+    }
+
     return ai;
 };
 
@@ -87,7 +107,10 @@ export async function* streamChatResponse(
     }
   } catch (error) {
     console.error("Gemini API error:", error);
-    throw new Error("Failed to get response from AI. Please check your API key and network connection.");
+    if (error instanceof Error && error.message.includes("API key not valid")) {
+         throw new Error("Your API key is not valid. Please check it and try again.");
+    }
+    throw new Error("Failed to get response from AI. Please check your network connection and API key.");
   }
 }
 

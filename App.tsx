@@ -54,6 +54,7 @@ import { ChatInput } from './components/ChatInput';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { HistorySidebar } from './components/HistorySidebar';
 import { XIcon } from './components/IconComponents';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import * as XLSX from 'xlsx';
 
 // Error Toast Component for prominent error display
@@ -90,7 +91,7 @@ const ErrorToast: React.FC<ErrorToastProps> = ({ message, onClose }) => {
 
     return (
         <div 
-            className={`fixed bottom-5 right-5 max-w-sm w-full bg-red-800 border border-red-600 text-white p-4 rounded-lg shadow-2xl transition-all duration-300 ease-in-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} z-30`}
+            className={`fixed bottom-5 right-5 max-w-sm w-full bg-red-800 border border-red-600 text-white p-4 rounded-lg shadow-2xl transition-all duration-300 ease-in-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} z-50`}
             role="alert"
             aria-live="assertive"
         >
@@ -120,10 +121,24 @@ const App: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isApiKeySet, setIsApiKeySet] = useState(false);
 
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Check for API key on initial load
+  useEffect(() => {
+    try {
+        const key = localStorage.getItem('gemini-api-key');
+        if (key) {
+            setIsApiKeySet(true);
+        }
+    } catch (e) {
+        console.error("Could not access localStorage", e);
+        setError("This app requires local storage to function. Please enable it in your browser.");
+    }
+  }, []);
 
   // Load conversations from localStorage on initial render
   useEffect(() => {
@@ -226,12 +241,10 @@ const App: React.FC = () => {
 
     const userMessage: ChatMessageType = { role: ChatRole.USER, content: messageContent };
     
-    // **FIX**: Capture the history for the API call *before* updating the state.
     const historyForApi = isNewConversation 
         ? [] 
         : conversations.find(c => c.id === currentConversationId)?.messages || [];
     
-    // Create a new conversation if one isn't active
     if (isNewConversation) {
         const newId = Date.now().toString();
         const newConversation: Conversation = {
@@ -241,9 +254,8 @@ const App: React.FC = () => {
         };
         setConversations(prev => [newConversation, ...prev]);
         setActiveConversationId(newId);
-        currentConversationId = newId; // Update local variable for this function's scope
+        currentConversationId = newId;
 
-        // Asynchronously get a better title
         generateTitle(messageText)
           .then(title => {
               setConversations(prev => prev.map(conv => 
@@ -252,7 +264,6 @@ const App: React.FC = () => {
           })
           .catch(err => console.error("Failed to generate title", err));
     } else {
-        // Add user message to the existing conversation
         setConversations(prev => prev.map(conv =>
             conv.id === currentConversationId ? { ...conv, messages: [...conv.messages, userMessage] } : conv
         ));
@@ -261,7 +272,6 @@ const App: React.FC = () => {
     setFile(null);
     setText('');
 
-    // Add a placeholder for the model's response
     setConversations(prev => prev.map(conv =>
         conv.id === currentConversationId ? { ...conv, messages: [...conv.messages, { role: ChatRole.MODEL, content: '' }] } : conv
     ));
@@ -283,11 +293,15 @@ const App: React.FC = () => {
         }
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(errorMessage);
+        if (errorMessage.includes("API key not valid")) {
+            setError("Your API key is not valid. Please check it and try again.");
+            setIsApiKeySet(false); // Re-open the API key modal
+        } else {
+            setError(errorMessage);
+        }
         setConversations(prev => prev.map(conv => {
             if (conv.id !== currentConversationId) return conv;
             const lastMessage = conv.messages[conv.messages.length - 1];
-            // To avoid adding multiple error messages, check if one already exists
             if (lastMessage.content.includes('**Error:**')) return conv;
             const updatedMessages = [
                 ...conv.messages.slice(0, -1),
@@ -335,45 +349,62 @@ const App: React.FC = () => {
       }
   };
 
+  const handleKeySubmit = (key: string) => {
+    try {
+        localStorage.setItem('gemini-api-key', key);
+        setIsApiKeySet(true);
+        setError(null);
+    } catch (e) {
+        console.error("Could not save to localStorage", e);
+        setError("Failed to save API key. Please ensure local storage is enabled and not full.");
+    }
+  };
+
+
   return (
     <div className="max-w-screen-2xl mx-auto">
-        <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
-        <HistorySidebar 
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onSelectConversation={selectConversation}
-            onDeleteConversation={deleteConversation}
-            onNewChat={startNewChat}
-            isOpen={isSidebarOpen}
-            setIsOpen={setIsSidebarOpen}
-        />
-        <div className="flex flex-col flex-1 min-w-0">
-            <Header onNewChat={startNewChat} onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
-            <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-6">
-            {activeMessages.length === 0 ? (
-                <WelcomeScreen onPromptClick={sendMessage} />
-            ) : (
-                activeMessages.map((msg, index) => (
-                <ChatMessage key={index} message={msg} />
-                ))
-            )}
-            </main>
-            <div className="p-2 sm:p-4 md:p-6 bg-gray-900 border-t border-gray-700/50">
-            <ChatInput 
-                onSendMessage={handleFormSubmit} 
-                isLoading={isLoading}
-                file={file}
-                onFileChange={setFile}
-                onFileRemove={() => setFile(null)}
-                text={text}
-                setText={setText}
-                isListening={isListening}
-                onToggleListening={handleToggleListening}
-            />
+        {!isApiKeySet ? (
+            <ApiKeyModal onKeySubmit={handleKeySubmit} />
+        ) : (
+            <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
+                <HistorySidebar 
+                    conversations={conversations}
+                    activeConversationId={activeConversationId}
+                    onSelectConversation={selectConversation}
+                    onDeleteConversation={deleteConversation}
+                    onNewChat={startNewChat}
+                    isOpen={isSidebarOpen}
+                    setIsOpen={setIsSidebarOpen}
+                    onManageApiKey={() => setIsApiKeySet(false)}
+                />
+                <div className="flex flex-col flex-1 min-w-0">
+                    <Header onNewChat={startNewChat} onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
+                    <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-6">
+                    {activeMessages.length === 0 ? (
+                        <WelcomeScreen onPromptClick={sendMessage} />
+                    ) : (
+                        activeMessages.map((msg, index) => (
+                        <ChatMessage key={index} message={msg} />
+                        ))
+                    )}
+                    </main>
+                    <div className="p-2 sm:p-4 md:p-6 bg-gray-900 border-t border-gray-700/50">
+                    <ChatInput 
+                        onSendMessage={handleFormSubmit} 
+                        isLoading={isLoading}
+                        file={file}
+                        onFileChange={setFile}
+                        onFileRemove={() => setFile(null)}
+                        text={text}
+                        setText={setText}
+                        isListening={isListening}
+                        onToggleListening={handleToggleListening}
+                    />
+                    </div>
+                </div>
             </div>
-        </div>
+        )}
         <ErrorToast message={error} onClose={() => setError(null)} />
-        </div>
     </div>
   );
 };

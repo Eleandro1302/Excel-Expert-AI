@@ -29,50 +29,30 @@ Um assistente com inteligência artificial que fornece respostas de especialista
 
 ## 🚀 Como Começar
 
-Este projeto está configurado para rodar diretamente no navegador sem uma etapa de build, graças ao `importmap`. No entanto, para lidar com a chave de API de forma segura, é necessário um servidor de desenvolvimento local com suporte a variáveis de ambiente.
+Este projeto foi desenhado para rodar diretamente em qualquer navegador moderno, sem necessidade de instalação ou processos de build.
 
 ### Pré-requisitos
 
 -   Um navegador web moderno (Chrome, Firefox, Safari, Edge).
--   Uma chave de API do Google Gemini. Você pode obter uma no [Google AI Studio](https://aistudio.google.com/app/apikey).
+-   Uma chave de API do Google Gemini. Você pode obter uma gratuitamente no [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-### Configuração do Ambiente Local
+### Como Usar
 
-As chamadas à API Gemini falharão sem uma chave de API. Siga estes passos para uma configuração local adequada:
-
-1.  **Clone o repositório:**
-    ```bash
-    git clone https://github.com/seu-usuario/excel-expert-ai.git
-    cd excel-expert-ai
-    ```
-
-2.  **Crie um arquivo de ambiente:**
-    Este projeto espera que a chave da API esteja disponível como uma variável de ambiente global. Para desenvolvimento local com uma ferramenta como o [Vite](https://vitejs.dev/), você pode criar um arquivo chamado `.env.local` na raiz do projeto:
-    ```
-    VITE_API_KEY=SUA_CHAVE_DE_API_GEMINI_AQUI
-    ```
-    *Observação: Você precisará ajustar `services/geminiService.ts` para ler a chave de `import.meta.env.VITE_API_KEY` em vez de `process.env.API_KEY` para que essa configuração funcione com o Vite.*
-
-3.  **Instale um servidor de desenvolvimento (ex: Vite):**
-    ```bash
-    npm install -g vite
-    ```
-
-4.  **Execute o servidor de desenvolvimento:**
-    ```bash
-    vite
-    ```
-    O Vite iniciará um servidor local e injetará as variáveis de ambiente, permitindo que a aplicação acesse sua chave de API. Abra a URL fornecida no seu terminal.
+1.  Abra o arquivo `index.html` no seu navegador ou acesse o link da aplicação.
+2.  Ao iniciar o aplicativo pela primeira vez, uma janela solicitará que você insira sua chave de API do Gemini.
+3.  Cole sua chave no campo e clique em "Salvar e Continuar".
+4.  Pronto! Agora você pode começar a fazer perguntas. Sua chave fica salva no armazenamento local do seu navegador para futuras visitas. Você pode alterá-la a qualquer momento usando o botão "Gerenciar Chave de API" na barra lateral.
 
 ## ⚙️ Como Funciona
 
 -   **Frontend**: A interface do usuário é uma aplicação de página única (SPA) construída com componentes React, gerenciando o estado das conversas, status de carregamento e entrada do usuário.
+-   **Gerenciamento da Chave de API**: O aplicativo solicita a chave de API do Gemini ao usuário no primeiro uso e a armazena de forma segura no `localStorage` do navegador. Isso permite que o aplicativo seja totalmente do lado do cliente e hospedado em qualquer plataforma estática.
 -   **Serviço Gemini (`services/geminiService.ts`)**: Este é o núcleo da interação com a IA.
-    -   Ele inicializa o cliente da IA do Google Gemini.
+    -   Ele inicializa o cliente da IA do Google Gemini usando a chave de API armazenada.
     -   Inclui uma **instrução de sistema** detalhada que prepara o modelo para atuar como um especialista experiente em Excel em português, garantindo respostas consistentes e de alta qualidade.
     -   Gerencia o streaming das respostas do chat para uma sensação de tempo real.
 -   **Manipulação de Arquivos**: Quando um usuário faz o upload de uma planilha, a biblioteca `xlsx` a processa no lado do cliente. O conteúdo é convertido para o formato CSV e adicionado ao início do prompt do usuário, dando contexto à IA para a consulta.
--   **Estado e Histórico**: O componente `App.tsx` gerencia o estado da aplicação. Todas as conversas são armazenadas no `localStorage` do navegador, permitindo que as sessões sejam persistidas.
+-   **Estado e Histórico**: O componente `App.tsx` gerencia o estado da aplicação. Todas as conversas também são armazenadas no `localStorage` do navegador, permitindo que as sessões sejam persistidas.
 
 ## 📄 Licença
 
