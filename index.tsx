@@ -1,7 +1,8 @@
 // All necessary imports are consolidated at the top.
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
-import { GoogleGenAI, Chat, ChatMessage as GeminiChatMessage } from "@google/genai";
+// Fix: The type `ChatMessage` is not exported from `@google/genai`. The correct type for chat history messages is `Content`.
+import { GoogleGenAI, Chat, Content as GeminiChatMessage } from "@google/genai";
 import * as XLSX from 'xlsx';
 
 // =================================================================
@@ -204,29 +205,32 @@ const SettingsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
+const EyeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+        <circle cx="12" cy="12" r="3"/>
+    </svg>
+);
+
+const EyeOffIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+        <line x1="2" x2="22" y1="2" y2="22"/>
+    </svg>
+);
+
+
 // =================================================================
 // GEMINI SERVICE (from services/geminiService.ts)
 // =================================================================
 
-let ai: GoogleGenAI | null = null;
-let currentApiKey: string | null = null;
-
-const getApiKey = (): string | null => {
-    return (process.env.API_KEY as string) || null;
-};
-
-const getAi = (): GoogleGenAI => {
-    const apiKey = getApiKey();
+const getAi = (apiKey: string): GoogleGenAI => {
     if (!apiKey) {
-        throw new Error("A chave da API Gemini não foi configurada no ambiente. O aplicativo não pode funcionar sem ela.");
+        throw new Error("A chave de API é necessária, mas não foi fornecida.");
     }
-    
-    if (!ai || currentApiKey !== apiKey) {
-        currentApiKey = apiKey;
-        ai = new GoogleGenAI({ apiKey: currentApiKey });
-    }
-
-    return ai;
+    return new GoogleGenAI({ apiKey });
 };
 
 const systemInstruction = `Função: Você é um especialista em Excel com mais de 20 anos de experiência. Sua missão é responder perguntas de forma clara, prática e completa, utilizando todos os recursos disponíveis no Excel — desde fórmulas simples até funções avançadas e macros VBA.
@@ -266,15 +270,16 @@ Resposta esperada:
 >
 > Gostaria de ver um exemplo de como fazer isso utilizando um código VBA?`;
 
-const startNewGeminiChatWithHistory = (history: ChatMessage[]): Chat => {
+const startNewGeminiChatWithHistory = (apiKey: string, history: ChatMessage[]): Chat => {
   const mappedHistory: GeminiChatMessage[] = history
     .filter(msg => msg.content.trim() !== '' || msg.role === ChatRole.USER)
     .map(msg => ({
       role: msg.role,
       parts: [{ text: msg.content }]
     }));
-
-  return getAi().chats.create({
+  
+  const ai = getAi(apiKey);
+  return ai.chats.create({
     model: 'gemini-flash-lite-latest',
     config: {
       systemInstruction: systemInstruction,
@@ -295,16 +300,17 @@ async function* streamChatResponse(
     }
   } catch (error) {
     console.error("Gemini API error:", error);
-    if (error instanceof Error && error.message.includes("API key not valid")) {
-         throw new Error("A chave de API configurada não é válida. Verifique a configuração do ambiente.");
+    if (error instanceof Error && (error.message.includes("API key not valid") || error.message.includes("API_KEY_INVALID"))) {
+         throw new Error("API key not valid");
     }
     throw new Error("Falha ao obter resposta da IA. Verifique sua conexão de rede e a configuração da chave de API.");
   }
 }
 
-async function generateTitle(prompt: string): Promise<string> {
+async function generateTitle(apiKey: string, prompt: string): Promise<string> {
     try {
-        const result = await getAi().models.generateContent({
+        const ai = getAi(apiKey);
+        const result = await ai.models.generateContent({
             model: 'gemini-flash-lite-latest',
             contents: `Gere um título curto e conciso (máximo de 5 palavras) para a seguinte pergunta do usuário. Responda APENAS com o título, sem nenhuma formatação ou texto adicional como aspas ou markdown. Pergunta: "${prompt}"`,
         });
@@ -320,6 +326,80 @@ async function generateTitle(prompt: string): Promise<string> {
 // =================================================================
 // UI COMPONENTS (from components folder)
 // =================================================================
+
+// --- ApiKeyModal.tsx ---
+interface ApiKeyModalProps {
+  isOpen: boolean;
+  onSave: (key: string) => void;
+  onClose: () => void;
+  apiKeyError: string | null;
+}
+const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClose, apiKeyError }) => {
+    const [apiKeyInput, setApiKeyInput] = useState('');
+    const [isKeyVisible, setIsKeyVisible] = useState(false);
+    const hasExistingKey = !!localStorage.getItem('gemini-api-key');
+
+    useEffect(() => {
+        if (isOpen) {
+            setApiKeyInput(localStorage.getItem('gemini-api-key') || '');
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleSave = () => {
+        if (apiKeyInput.trim()) {
+            onSave(apiKeyInput.trim());
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="api-modal-title">
+            <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-gray-700 relative" onClick={e => e.stopPropagation()}>
+                {hasExistingKey && (
+                    <button onClick={onClose} className="absolute top-3 right-3 p-1 text-gray-500 hover:text-white rounded-full hover:bg-gray-700 transition-colors" aria-label="Close modal">
+                        <XIcon className="h-5 w-5" />
+                    </button>
+                )}
+                <div className="flex items-center gap-3 mb-4">
+                    <SettingsIcon className="h-6 w-6 text-green-400" />
+                    <h2 id="api-modal-title" className="text-xl font-bold text-white">Configure API Key</h2>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                    To use Excel Expert AI, please provide your Google Gemini API key. Your key is stored securely in your browser's local storage and is never sent anywhere else.
+                </p>
+                <p className="text-sm text-gray-400 mb-4">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline">
+                        Get your Gemini API Key from Google AI Studio
+                    </a>
+                </p>
+                {apiKeyError && <div className="bg-red-900/50 border border-red-700 text-red-300 text-sm p-3 rounded-md mb-4">{apiKeyError}</div>}
+                <div className="relative">
+                    <input
+                        type={isKeyVisible ? 'text' : 'password'}
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Enter your Gemini API key"
+                        className="w-full bg-gray-900 border border-gray-600 rounded-md p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:outline-none pr-10"
+                    />
+                     <button
+                        type="button"
+                        onClick={() => setIsKeyVisible(!isKeyVisible)}
+                        className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-white"
+                        aria-label={isKeyVisible ? 'Hide API key' : 'Show API key'}
+                    >
+                       {isKeyVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    </button>
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <button onClick={handleSave} className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={!apiKeyInput.trim()}>
+                        Save and Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- WelcomeScreen.tsx ---
 interface WelcomeScreenProps {
@@ -535,8 +615,9 @@ interface ChatInputProps {
   setText: (text: string) => void;
   isListening: boolean;
   onToggleListening: () => void;
+  isApiKeySet: boolean;
 }
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, file, onFileChange, onFileRemove, text, setText, isListening, onToggleListening }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, file, onFileChange, onFileRemove, text, setText, isListening, onToggleListening, isApiKeySet }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -546,7 +627,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, file, o
       textareaRef.current.style.height = `${scrollHeight}px`;
     }
   }, [text]);
-  const handleSubmit = () => { if ((text.trim() || file) && !isLoading) { onSendMessage(); } };
+  const isDisabled = isLoading || !isApiKeySet;
+  const handleSubmit = () => { if ((text.trim() || file) && !isDisabled) { onSendMessage(); } };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSubmit(); } };
   const handleFileButtonClick = () => { fileInputRef.current?.click(); };
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -568,15 +650,15 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, file, o
         </div>
       )}
       <div className="relative flex items-end bg-gray-800 rounded-xl border border-gray-700 focus-within:ring-2 focus-within:ring-green-500 transition-all duration-200">
-        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".xlsx,.xls,.csv" disabled={isLoading} />
-        <button onClick={handleFileButtonClick} disabled={isLoading} className="p-2 ml-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors" aria-label="Attach file">
+        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".xlsx,.xls,.csv" disabled={isDisabled} />
+        <button onClick={handleFileButtonClick} disabled={isDisabled} className="p-2 ml-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50" aria-label="Attach file">
           <UploadIcon className="w-5 h-5" />
         </button>
-        <button onClick={onToggleListening} disabled={isLoading} className={`p-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors ${isListening ? 'text-red-500' : ''}`} aria-label={isListening ? "Stop listening" : "Start listening"}>
+        <button onClick={onToggleListening} disabled={isDisabled} className={`p-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50 ${isListening ? 'text-red-500' : ''}`} aria-label={isListening ? "Stop listening" : "Start listening"}>
           <MicrophoneIcon className={`w-5 h-5 ${isListening ? 'animate-pulse' : ''}`} />
         </button>
-        <textarea ref={textareaRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything about Excel, or upload a file..."} rows={1} className="w-full bg-transparent p-3 pr-12 text-gray-200 placeholder-gray-500 focus:outline-none resize-none max-h-48" disabled={isLoading} />
-        <button onClick={handleSubmit} disabled={isLoading || (!text.trim() && !file)} className="absolute right-3 bottom-3 p-2 rounded-full bg-green-600 text-white disabled:bg-gray-600 disabled:cursor-not-allowed hover:bg-green-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50" aria-label="Send message">
+        <textarea ref={textareaRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder={!isApiKeySet ? "Please set your API key to begin..." : (isListening ? "Listening..." : "Ask anything about Excel, or upload a file...")} rows={1} className="w-full bg-transparent p-3 pr-12 text-gray-200 placeholder-gray-500 focus:outline-none resize-none max-h-48" disabled={isDisabled} />
+        <button onClick={handleSubmit} disabled={isDisabled || (!text.trim() && !file)} className="absolute right-3 bottom-3 p-2 rounded-full bg-green-600 text-white disabled:bg-gray-600 disabled:cursor-not-allowed hover:bg-green-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50" aria-label="Send message">
           <SendIcon className="w-5 h-5" />
         </button>
       </div>
@@ -608,7 +690,7 @@ const Header: React.FC<HeaderProps> = ({ onNewChat, onToggleSidebar }) => {
 };
 
 // --- HistorySidebar.tsx ---
-interface HistorySidebarProps { conversations: Conversation[]; activeConversationId: string | null; onSelectConversation: (id: string) => void; onDeleteConversation: (id: string) => void; onNewChat: () => void; isOpen: boolean; setIsOpen: (isOpen: boolean) => void; }
+interface HistorySidebarProps { conversations: Conversation[]; activeConversationId: string | null; onSelectConversation: (id: string) => void; onDeleteConversation: (id: string) => void; onNewChat: () => void; isOpen: boolean; setIsOpen: (isOpen: boolean) => void; onManageApiKey: () => void; }
 interface ConfirmationModalProps { isOpen: boolean; onClose: () => void; onConfirm: () => void; conversationTitle: string; }
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, conversationTitle }) => {
     if (!isOpen) return null;
@@ -625,7 +707,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
         </div>
     );
 };
-const HistorySidebar: React.FC<HistorySidebarProps> = ({ conversations, activeConversationId, onSelectConversation, onDeleteConversation, onNewChat, isOpen, setIsOpen }) => {
+const HistorySidebar: React.FC<HistorySidebarProps> = ({ conversations, activeConversationId, onSelectConversation, onDeleteConversation, onNewChat, isOpen, setIsOpen, onManageApiKey }) => {
   const [conversationToDelete, setConversationToDelete] = React.useState<Conversation | null>(null);
   const requestDelete = (convo: Conversation) => { setConversationToDelete(convo); };
   const confirmDelete = () => { if (conversationToDelete) { onDeleteConversation(conversationToDelete.id); setConversationToDelete(null); } };
@@ -651,7 +733,13 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({ conversations, activeCo
                     ))
                 ) : ( <div className="text-center text-xs text-gray-500 p-4">No chat history yet. Start a new conversation!</div> )}
             </nav>
-            <div className="p-4 border-t border-gray-700/50 mt-auto flex-shrink-0"><p className="text-xs text-center text-gray-500">Excel Expert AI by Eleandro</p></div>
+            <div className="p-2 border-t border-gray-700/50 mt-auto flex-shrink-0 space-y-2">
+                 <button onClick={onManageApiKey} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:bg-gray-700/50 hover:text-gray-200 rounded-md transition-colors">
+                    <SettingsIcon className="h-4 w-4" />
+                    <span>Manage API Key</span>
+                </button>
+                <p className="text-xs text-center text-gray-500 !mt-2">Excel Expert AI by Eleandro</p>
+            </div>
         </aside>
         <ConfirmationModal isOpen={!!conversationToDelete} onClose={cancelDelete} onConfirm={confirmDelete} conversationTitle={conversationToDelete?.title || ''} />
     </>
@@ -697,8 +785,19 @@ const App: React.FC = () => {
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
   useEffect(() => {
+    const savedKey = localStorage.getItem('gemini-api-key');
+    if (savedKey) {
+        setApiKey(savedKey);
+    } else {
+        setIsApiKeyModalOpen(true);
+    }
+    
     try {
         const savedConversations = localStorage.getItem('excel-expert-conversations');
         if (savedConversations) { setConversations(JSON.parse(savedConversations)); }
@@ -748,6 +847,11 @@ const App: React.FC = () => {
   }, [conversations, activeConversationId]);
 
   const sendMessage = useCallback(async (messageText: string) => {
+    if (!apiKey) {
+        setApiKeyError("Please set your API key to start chatting.");
+        setIsApiKeyModalOpen(true);
+        return;
+    }
     if (!messageText.trim() && !file) return;
     setIsLoading(true);
     setError(null);
@@ -784,7 +888,7 @@ const App: React.FC = () => {
         setConversations(prev => [newConversation, ...prev]);
         setActiveConversationId(newId);
         currentConversationId = newId;
-        generateTitle(messageText).then(title => { setConversations(prev => prev.map(conv => conv.id === newId ? { ...conv, title } : conv)); }).catch(err => console.error("Failed to generate title", err));
+        generateTitle(apiKey, messageText).then(title => { setConversations(prev => prev.map(conv => conv.id === newId ? { ...conv, title } : conv)); }).catch(err => console.error("Failed to generate title", err));
     } else {
         setConversations(prev => prev.map(conv => conv.id === currentConversationId ? { ...conv, messages: [...conv.messages, userMessage] } : conv));
     }
@@ -794,7 +898,7 @@ const App: React.FC = () => {
     setConversations(prev => prev.map(conv => conv.id === currentConversationId ? { ...conv, messages: [...conv.messages, { role: ChatRole.MODEL, content: '' }] } : conv));
 
     try {
-        const chat = startNewGeminiChatWithHistory(historyForApi);
+        const chat = startNewGeminiChatWithHistory(apiKey, historyForApi);
         const stream = streamChatResponse(chat, messageContent);
         for await (const chunk of stream) {
             setConversations(prev => prev.map(conv => {
@@ -806,18 +910,37 @@ const App: React.FC = () => {
         }
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
-        setError(errorMessage);
-        setConversations(prev => prev.map(conv => {
-            if (conv.id !== currentConversationId) return conv;
-            const lastMessage = conv.messages[conv.messages.length - 1];
-            if (lastMessage.content.includes('**Error:**')) return conv;
-            const updatedMessages = [...conv.messages.slice(0, -1), { ...lastMessage, content: lastMessage.content + `\n\n**Erro:** ${errorMessage}` }];
-            return { ...conv, messages: updatedMessages };
-        }));
+        if (err instanceof Error && err.message.includes("API key not valid")) {
+            localStorage.removeItem('gemini-api-key');
+            setApiKey(null);
+            setApiKeyError("The provided API key is invalid or has been revoked. Please enter a valid key.");
+            setIsApiKeyModalOpen(true);
+            setConversations(prev => prev.map(conv => {
+                if (conv.id !== currentConversationId) return conv;
+                const userMessages = conv.messages.filter(m => m.role === ChatRole.USER);
+                return { ...conv, messages: userMessages };
+            }));
+        } else {
+            setError(errorMessage);
+            setConversations(prev => prev.map(conv => {
+                if (conv.id !== currentConversationId) return conv;
+                const lastMessage = conv.messages[conv.messages.length - 1];
+                if (lastMessage.content.includes('**Erro:**')) return conv;
+                const updatedMessages = [...conv.messages.slice(0, -1), { ...lastMessage, content: lastMessage.content + `\n\n**Erro:** ${errorMessage}` }];
+                return { ...conv, messages: updatedMessages };
+            }));
+        }
     } finally {
         setIsLoading(false);
     }
-  }, [activeConversationId, conversations, file, isListening]);
+  }, [apiKey, activeConversationId, conversations, file, isListening]);
+  
+  const handleSaveApiKey = (key: string) => {
+    localStorage.setItem('gemini-api-key', key);
+    setApiKey(key);
+    setApiKeyError(null);
+    setIsApiKeyModalOpen(false);
+  };
 
   const handleFormSubmit = () => { sendMessage(text); };
   const startNewChat = () => { setActiveConversationId(null); setError(null); setFile(null); setText(''); setIsSidebarOpen(false); };
@@ -830,8 +953,9 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-screen-2xl mx-auto">
+        <ApiKeyModal isOpen={isApiKeyModalOpen} onSave={handleSaveApiKey} onClose={() => setIsApiKeyModalOpen(false)} apiKeyError={apiKeyError} />
         <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
-            <HistorySidebar conversations={conversations} activeConversationId={activeConversationId} onSelectConversation={selectConversation} onDeleteConversation={deleteConversation} onNewChat={startNewChat} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+            <HistorySidebar conversations={conversations} activeConversationId={activeConversationId} onSelectConversation={selectConversation} onDeleteConversation={deleteConversation} onNewChat={startNewChat} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} onManageApiKey={() => { setApiKeyError(null); setIsApiKeyModalOpen(true); }} />
             <div className="flex flex-col flex-1 min-w-0">
                 <Header onNewChat={startNewChat} onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
                 <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-6">
@@ -844,7 +968,7 @@ const App: React.FC = () => {
                 )}
                 </main>
                 <div className="p-2 sm:p-4 md:p-6 bg-gray-900 border-t border-gray-700/50">
-                <ChatInput onSendMessage={handleFormSubmit} isLoading={isLoading} file={file} onFileChange={setFile} onFileRemove={() => setFile(null)} text={text} setText={setText} isListening={isListening} onToggleListening={handleToggleListening} />
+                <ChatInput onSendMessage={handleFormSubmit} isLoading={isLoading} file={file} onFileChange={setFile} onFileRemove={() => setFile(null)} text={text} setText={setText} isListening={isListening} onToggleListening={handleToggleListening} isApiKeySet={!!apiKey} />
                 </div>
             </div>
         </div>
