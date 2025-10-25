@@ -22,7 +22,29 @@
 </head>
   <body class="bg-gray-900">
     <div id="root"></div>
-    <!-- A tag de script foi atualizada para usar o Babel para transpilar o TSX -->
-    <script type="text/babel" data-presets="react,typescript" data-type="module" src="index.tsx"></script>
+    <!-- A tag de script foi atualizada para usar um carregador robusto que transpila o TSX manualmente -->
+    <script type="module">
+      (async () => {
+        try {
+          const response = await fetch('index.tsx');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const tsxCode = await response.text();
+          const options = { presets: ['react', 'typescript'], filename: 'index.tsx' };
+          const { code } = Babel.transform(tsxCode, options);
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.textContent = code;
+          document.body.appendChild(script);
+        } catch (error) {
+          console.error('Failed to load and transpile index.tsx:', error);
+          const root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = `<div style="color: red; padding: 20px; text-align: center; font-family: sans-serif;">An error occurred while loading the application. Please check the browser console for more details.</div>`;
+          }
+        }
+      })();
+    </script>
   </body>
 </html>
