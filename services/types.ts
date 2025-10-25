@@ -1,16 +1,2 @@
-
-export enum ChatRole {
-  USER = 'user',
-  MODEL = 'model',
-}
-
-export interface ChatMessage {
-  role: ChatRole;
-  content: string;
-}
-
-export interface Conversation {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-}
+// This file's content has been moved to index.tsx to enable deployment on GitHub Pages.
+// This file is no longer used.
