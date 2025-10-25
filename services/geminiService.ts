@@ -1,31 +1,26 @@
 import { GoogleGenAI, Chat, ChatMessage as GeminiChatMessage } from "@google/genai";
-import { ChatMessage, ChatRole } from "../types";
+import { ChatMessage, ChatRole } from "./types.ts";
 
 let ai: GoogleGenAI | null = null;
 let currentApiKey: string | null = null;
 
 /**
- * Retrieves the API key from the browser's local storage.
+ * Retrieves the API key from the environment variables.
  */
 const getApiKey = (): string | null => {
-    try {
-        return localStorage.getItem('gemini-api-key');
-    } catch (e) {
-        console.error("Could not access localStorage to get API key", e);
-        return null;
-    }
+    // The API key MUST be obtained exclusively from the environment variable `process.env.API_KEY`.
+    return (process.env.API_KEY as string) || null;
 };
 
 
 /**
- * Initializes and returns the GoogleGenAI instance using the key from local storage.
+ * Initializes and returns the GoogleGenAI instance using the key from the environment.
  * It re-initializes the client if the API key has changed.
- * This prevents the app from crashing and allows the key to be set by the user.
  */
 const getAi = (): GoogleGenAI => {
     const apiKey = getApiKey();
     if (!apiKey) {
-        throw new Error("Gemini API key not found in your browser's local storage. Please set it via the 'Manage API Key' button.");
+        throw new Error("A chave da API Gemini não foi configurada no ambiente. O aplicativo não pode funcionar sem ela.");
     }
     
     // Re-initialize if the key has changed since last time
@@ -108,9 +103,9 @@ export async function* streamChatResponse(
   } catch (error) {
     console.error("Gemini API error:", error);
     if (error instanceof Error && error.message.includes("API key not valid")) {
-         throw new Error("Your API key is not valid. Please check it and try again.");
+         throw new Error("A chave de API configurada não é válida. Verifique a configuração do ambiente.");
     }
-    throw new Error("Failed to get response from AI. Please check your network connection and API key.");
+    throw new Error("Falha ao obter resposta da IA. Verifique sua conexão de rede e a configuração da chave de API.");
   }
 }
 

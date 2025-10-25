@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExcelIcon, PlusIcon, MenuIcon } from './IconComponents';
+import { ExcelIcon, PlusIcon, MenuIcon } from './IconComponents.tsx';
 
 interface HeaderProps {
     onNewChat: () => void;

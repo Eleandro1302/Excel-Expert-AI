@@ -46,15 +46,14 @@ declare global {
 }
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { streamChatResponse, generateTitle, startNewGeminiChatWithHistory } from './services/geminiService';
-import { ChatMessage as ChatMessageType, ChatRole, Conversation } from './types';
-import { Header } from './components/Header';
-import { ChatMessage } from './components/ChatMessage';
-import { ChatInput } from './components/ChatInput';
-import { WelcomeScreen } from './components/WelcomeScreen';
-import { HistorySidebar } from './components/HistorySidebar';
-import { XIcon } from './components/IconComponents';
-import { ApiKeyModal } from './components/ApiKeyModal';
+import { streamChatResponse, generateTitle, startNewGeminiChatWithHistory } from './services/geminiService.ts';
+import { ChatMessage as ChatMessageType, ChatRole, Conversation } from './services/types.ts';
+import { Header } from './components/Header.tsx';
+import { ChatMessage } from './components/ChatMessage.tsx';
+import { ChatInput } from './components/ChatInput.tsx';
+import { WelcomeScreen } from './components/WelcomeScreen.tsx';
+import { HistorySidebar } from './components/HistorySidebar.tsx';
+import { XIcon } from './components/IconComponents.tsx';
 import * as XLSX from 'xlsx';
 
 // Error Toast Component for prominent error display
@@ -121,24 +120,10 @@ const App: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isApiKeySet, setIsApiKeySet] = useState(false);
 
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  // Check for API key on initial load
-  useEffect(() => {
-    try {
-        const key = localStorage.getItem('gemini-api-key');
-        if (key) {
-            setIsApiKeySet(true);
-        }
-    } catch (e) {
-        console.error("Could not access localStorage", e);
-        setError("This app requires local storage to function. Please enable it in your browser.");
-    }
-  }, []);
 
   // Load conversations from localStorage on initial render
   useEffect(() => {
@@ -292,20 +277,15 @@ const App: React.FC = () => {
             }));
         }
     } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        if (errorMessage.includes("API key not valid")) {
-            setError("Your API key is not valid. Please check it and try again.");
-            setIsApiKeySet(false); // Re-open the API key modal
-        } else {
-            setError(errorMessage);
-        }
+        const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
+        setError(errorMessage);
         setConversations(prev => prev.map(conv => {
             if (conv.id !== currentConversationId) return conv;
             const lastMessage = conv.messages[conv.messages.length - 1];
             if (lastMessage.content.includes('**Error:**')) return conv;
             const updatedMessages = [
                 ...conv.messages.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + `\n\n**Error:** ${errorMessage}` }
+                { ...lastMessage, content: lastMessage.content + `\n\n**Erro:** ${errorMessage}` }
             ];
             return { ...conv, messages: updatedMessages };
         }));
@@ -349,61 +329,44 @@ const App: React.FC = () => {
       }
   };
 
-  const handleKeySubmit = (key: string) => {
-    try {
-        localStorage.setItem('gemini-api-key', key);
-        setIsApiKeySet(true);
-        setError(null);
-    } catch (e) {
-        console.error("Could not save to localStorage", e);
-        setError("Failed to save API key. Please ensure local storage is enabled and not full.");
-    }
-  };
-
-
   return (
     <div className="max-w-screen-2xl mx-auto">
-        {!isApiKeySet ? (
-            <ApiKeyModal onKeySubmit={handleKeySubmit} />
-        ) : (
-            <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
-                <HistorySidebar 
-                    conversations={conversations}
-                    activeConversationId={activeConversationId}
-                    onSelectConversation={selectConversation}
-                    onDeleteConversation={deleteConversation}
-                    onNewChat={startNewChat}
-                    isOpen={isSidebarOpen}
-                    setIsOpen={setIsSidebarOpen}
-                    onManageApiKey={() => setIsApiKeySet(false)}
+        <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
+            <HistorySidebar 
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelectConversation={selectConversation}
+                onDeleteConversation={deleteConversation}
+                onNewChat={startNewChat}
+                isOpen={isSidebarOpen}
+                setIsOpen={setIsSidebarOpen}
+            />
+            <div className="flex flex-col flex-1 min-w-0">
+                <Header onNewChat={startNewChat} onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
+                <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-6">
+                {activeMessages.length === 0 ? (
+                    <WelcomeScreen onPromptClick={sendMessage} />
+                ) : (
+                    activeMessages.map((msg, index) => (
+                    <ChatMessage key={index} message={msg} />
+                    ))
+                )}
+                </main>
+                <div className="p-2 sm:p-4 md:p-6 bg-gray-900 border-t border-gray-700/50">
+                <ChatInput 
+                    onSendMessage={handleFormSubmit} 
+                    isLoading={isLoading}
+                    file={file}
+                    onFileChange={setFile}
+                    onFileRemove={() => setFile(null)}
+                    text={text}
+                    setText={setText}
+                    isListening={isListening}
+                    onToggleListening={handleToggleListening}
                 />
-                <div className="flex flex-col flex-1 min-w-0">
-                    <Header onNewChat={startNewChat} onToggleSidebar={() => setIsSidebarOpen(prev => !prev)} />
-                    <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-6">
-                    {activeMessages.length === 0 ? (
-                        <WelcomeScreen onPromptClick={sendMessage} />
-                    ) : (
-                        activeMessages.map((msg, index) => (
-                        <ChatMessage key={index} message={msg} />
-                        ))
-                    )}
-                    </main>
-                    <div className="p-2 sm:p-4 md:p-6 bg-gray-900 border-t border-gray-700/50">
-                    <ChatInput 
-                        onSendMessage={handleFormSubmit} 
-                        isLoading={isLoading}
-                        file={file}
-                        onFileChange={setFile}
-                        onFileRemove={() => setFile(null)}
-                        text={text}
-                        setText={setText}
-                        isListening={isListening}
-                        onToggleListening={handleToggleListening}
-                    />
-                    </div>
                 </div>
             </div>
-        )}
+        </div>
         <ErrorToast message={error} onClose={() => setError(null)} />
     </div>
   );

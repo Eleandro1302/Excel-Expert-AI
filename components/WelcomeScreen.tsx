@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ExcelIcon } from './IconComponents';
+import { ExcelIcon } from './IconComponents.tsx';
 
 interface WelcomeScreenProps {
   onPromptClick: (prompt: string) => void;

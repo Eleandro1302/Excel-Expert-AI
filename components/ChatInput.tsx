@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
-import { SendIcon, UploadIcon, FileIcon, TrashIcon, MicrophoneIcon } from './IconComponents';
+import { SendIcon, UploadIcon, FileIcon, TrashIcon, MicrophoneIcon } from './IconComponents.tsx';
 
 interface ChatInputProps {
   onSendMessage: () => void;
