@@ -5,6 +5,11 @@ import ReactDOM from 'react-dom/client';
 import { GoogleGenAI, Chat, Content as GeminiChatMessage } from "@google/genai";
 import * as XLSX from 'xlsx';
 
+// Add declarations for client-side libraries
+declare const pdfjsLib: any;
+declare const mammoth: any;
+
+
 // =================================================================
 // TYPE DEFINITIONS (from services/types.ts and App.tsx)
 // =================================================================
@@ -233,42 +238,53 @@ const getAi = (apiKey: string): GoogleGenAI => {
     return new GoogleGenAI({ apiKey });
 };
 
-const systemInstruction = `Função: Você é um especialista em Excel com mais de 20 anos de experiência. Sua missão é responder perguntas de forma clara, prática e completa, utilizando todos os recursos disponíveis no Excel — desde fórmulas simples até funções avançadas e macros VBA.
+const systemInstruction = `Função: Você é um especialista em Excel, mas sua missão é ser um professor paciente e claro, explicando tudo da forma mais simples possível, como se estivesse ensinando alguém que nunca usou Excel antes.
 
-Instruções:
-- **REGRA PRINCIPAL:** Se o usuário pedir explicitamente por um código VBA, forneça-o diretamente. Para outras perguntas, primeiro ofereça a solução mais comum (geralmente uma fórmula do Excel). Após a explicação da fórmula, você DEVE perguntar se o usuário gostaria de ver uma alternativa em VBA.
-- Sempre explique de forma acessível, adaptando o nível técnico ao perfil do usuário.
-- Dê exemplos práticos e contextualizados.
-- Quando possível, sugira boas práticas e alternativas mais eficientes.
-- Se a dúvida envolver erro ou problema, identifique possíveis causas e proponha soluções.
-- Use linguagem amigável, profissional e motivadora.
+Instruções Principais:
+- **SIMPLICIDADE É A CHAVE:** Sua primeira resposta DEVE ser sempre a mais simples e direta possível. Evite jargões técnicos e use analogias do dia a dia.
+- **PERGUNTE ANTES DE APROFUNDAR:** Ao final de CADA resposta, você DEVE perguntar ao usuário se ele gostaria de uma explicação mais técnica ou profissional. Por exemplo: "Essa explicação ajudou? Você gostaria de ver uma versão mais detalhada com detalhes técnicos?".
+- **VBA SOB DEMANDA:** Se o usuário pedir explicitamente por um código VBA, forneça-o diretamente. Para outras perguntas, ofereça a solução com fórmula (a mais simples!) e, após explicar, pergunte se o usuário prefere uma alternativa em VBA.
+- **ANÁLISE DE ARQUIVOS:** Se o usuário enviar um arquivo (PDF, DOCX, etc.), analise o conteúdo para responder. Foque em extrair as informações de forma simples e mostre como usá-las no Excel.
+
+Instruções Adicionais:
+- Dê exemplos práticos e fáceis de entender.
+- Se a dúvida for sobre um erro, explique a causa mais comum de forma simples e dê uma solução passo a passo.
+- Use linguagem amigável, profissional e encorajadora.
 - Formate suas respostas usando markdown. Para blocos de código Excel, use \`\`\`excel ... \`\`\`. Para blocos de código VBA, use \`\`\`vba ... \`\`\`.
-- Para fornecer dados para download como um arquivo CSV, formate a saída dentro de um bloco de código markdown com o tipo 'csv'. Por exemplo:
-\`\`\`csv
-Cabeçalho1,Cabeçalho2
-Valor1,Valor2
-\`\`\`
+- Para fornecer dados para download como um arquivo CSV, formate a saída dentro de um bloco de código markdown com o tipo 'csv'.
+
+**CRIAÇÃO DE PLANILHAS PROFISSIONAIS:**
+- Se o usuário pedir para você criar uma planilha (ex: "crie um relatório de vendas"), gere os dados e forneça instruções SIMPLES para formatação e criação de gráficos.
+- **OBRIGATÓRIO:** Os dados da planilha DEVEM ser fornecidos dentro de um bloco de código markdown do tipo \`json-excel\`. O JSON deve ter a seguinte estrutura: \`{"fileName": "nome-do-arquivo.xlsx", "sheetName": "Nome da Aba", "data": [{"Coluna1": "Valor1", "Coluna2": "Valor2"}, ...]}\`.
+- Explique o que a planilha contém e dê o passo a passo de forma bem clara.
+- **SEMPRE AO FINAL** da sua resposta, após gerar a planilha, pergunte ao usuário: "Você gostaria de ajuda para criar um dashboard mais avançado no Power BI ou uma macro VBA com estes dados?".
 
 Estilo de resposta:
-- Clareza e objetividade.
-- Estrutura com tópicos ou passos numerados.
-- Exemplos com fórmulas e explicações, sempre seguidos pela oferta de um exemplo VBA (a menos que o VBA tenha sido solicitado inicialmente).
+- Clareza e objetividade, focado em iniciantes.
+- Estrutura com tópicos ou passos numerados fáceis de seguir.
+- Exemplos com fórmulas e explicações simples.
 
 Exemplo de entrada do usuário:
-> Como faço para somar valores de uma coluna apenas se outra coluna tiver o texto "Confirmado"?
+> Como eu uso a função SOMAS?
 
 Resposta esperada:
-> Para somar valores de uma coluna com base em um critério, você pode usar a função SOMASE do Excel. É uma solução direta para planilhas.
+> A função SOMAS é como uma calculadora inteligente para o Excel! Você diz para ela somar números em um intervalo, mas só se eles obedecerem a uma condição que você escolher.
 >
-> Exemplo da fórmula:
+> Por exemplo, imagine que você tem uma lista de vendas e quer somar só as vendas da "Maria".
+>
+> A fórmula seria assim:
 > \`\`\`excel
-> =SOMASE(B2:B100; "Confirmado"; A2:A100)
+> =SOMAS(C2:C10; "Maria"; D2:D10)
 > \`\`\`
-> - \`B2:B100\`: intervalo onde está o critério ("Confirmado")
-> - \`"Confirmado"\`: o texto que será usado como filtro
-> - \`A2:A100\`: intervalo dos valores que serão somados
 >
-> Gostaria de ver um exemplo de como fazer isso utilizando um código VBA?`;
+> **O que isso faz?**
+> 1.  \`C2:C10\`: Onde o Excel vai procurar o nome (a coluna dos vendedores).
+> 2.  \`"Maria"\`: O que ele está procurando.
+> 3.  \`D2:D10\`: O que ele deve somar (a coluna com os valores das vendas).
+>
+> Resumindo: "Excel, olhe na coluna C, encontre todas as células com 'Maria' e some os valores correspondentes que estão na coluna D".
+>
+> Essa explicação ajudou? Você gostaria de uma versão mais técnica sobre a função SOMAS ou de ver um exemplo em VBA?`;
 
 const startNewGeminiChatWithHistory = (apiKey: string, history: ChatMessage[]): Chat => {
   const mappedHistory: GeminiChatMessage[] = history
@@ -408,7 +424,7 @@ interface WelcomeScreenProps {
 const examplePrompts = [
   "How do I use VLOOKUP?",
   "Create a VBA macro to sort data in column A.",
-  "What is a Pivot Table?",
+  "Create a professional sales report with a chart",
   "Explain the SUMIF function with an example."
 ];
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onPromptClick }) => {
@@ -535,7 +551,7 @@ const VbaCodeBlock: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     </div>
   );
 };
-const DownloadBlock: React.FC<{ content: string }> = ({ content }) => {
+const DownloadCsvBlock: React.FC<{ content: string }> = ({ content }) => {
     const handleDownload = () => {
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -565,9 +581,84 @@ const DownloadBlock: React.FC<{ content: string }> = ({ content }) => {
         </div>
     );
 };
+const DownloadExcelBlock: React.FC<{ content: string }> = ({ content }) => {
+    const parsedConfig = useMemo(() => {
+        try {
+            return JSON.parse(content);
+        } catch (error) {
+            console.error("Failed to parse JSON for Excel block:", error);
+            return null;
+        }
+    }, [content]);
+
+    const handleDownload = () => {
+        if (!parsedConfig || !parsedConfig.data) {
+             console.error("No valid data to create Excel file.");
+             return;
+        }
+        try {
+            const worksheet = XLSX.utils.json_to_sheet(parsedConfig.data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, parsedConfig.sheetName || 'Sheet1');
+            XLSX.writeFile(workbook, parsedConfig.fileName || 'export.xlsx');
+        } catch (error) {
+            console.error("Failed to create Excel file:", error);
+        }
+    };
+
+    if (!parsedConfig) {
+        return (
+            <div className="bg-red-900/50 rounded-md my-4 p-4 text-sm text-red-300 border border-red-700">
+                <p><strong>Error:</strong> Could not read the Excel data provided by the AI. The format might be incorrect.</p>
+            </div>
+        );
+    }
+    
+    const headers = parsedConfig.data.length > 0 ? Object.keys(parsedConfig.data[0]) : [];
+    const previewRows = parsedConfig.data.slice(0, 5);
+
+    return (
+        <div className="bg-gray-900/70 rounded-md my-4 border border-gray-700/50">
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-gray-700/50">
+                <div className="flex items-center gap-2">
+                    <ExcelIcon className="h-5 w-5 text-green-400" />
+                    <span className="text-sm font-semibold text-gray-400">Excel File: {parsedConfig.fileName || 'export.xlsx'}</span>
+                </div>
+                <button onClick={handleDownload} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors" aria-label="Download Excel File">
+                    <DownloadIcon className="h-4 w-4" />
+                    <span>Download .xlsx</span>
+                </button>
+            </div>
+            <div className="p-4">
+                <p className="text-xs text-gray-500 italic mb-3">
+                    Data preview. The text above provides instructions for formatting and creating charts.
+                </p>
+                <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-700">
+                    <table className="w-full text-sm text-left text-gray-300">
+                        <thead className="text-xs text-gray-400 uppercase bg-gray-700/50 sticky top-0">
+                            <tr>
+                                {headers.map(header => <th key={header} scope="col" className="px-4 py-2 font-medium">{header}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {previewRows.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="bg-gray-800/50 border-b border-gray-700/50 last:border-b-0 hover:bg-gray-700/60">
+                                    {headers.map(header => <td key={`${rowIndex}-${header}`} className="px-4 py-2 truncate max-w-xs">{String(row[header])}</td>)}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                {parsedConfig.data.length > 5 && (
+                    <p className="text-center text-xs text-gray-500 mt-2">... and {parsedConfig.data.length - 5} more rows.</p>
+                )}
+            </div>
+        </div>
+    );
+};
 const FormattedContent: React.FC<{ content: string }> = ({ content }) => {
   if (!content) return <span className="animate-pulse">...</span>;
-  const parts = content.split(/(\`\`\`(?:excel|vba|csv)[\s\S]*?\`\`\`)/g);
+  const parts = content.split(/(\`\`\`(?:excel|vba|csv|json-excel)[\s\S]*?\`\`\`)/g);
   return (
     <>
       {parts.map((part, index) => {
@@ -581,7 +672,11 @@ const FormattedContent: React.FC<{ content: string }> = ({ content }) => {
         }
         if (part.startsWith('```csv')) {
           const csvContent = part.replace(/^```csv\n?/, '').replace(/\n?```$/, '').trim();
-          return <DownloadBlock key={index} content={csvContent} />;
+          return <DownloadCsvBlock key={index} content={csvContent} />;
+        }
+        if (part.startsWith('```json-excel')) {
+          const jsonContent = part.replace(/^```json-excel\n?/, '').replace(/\n?```$/, '').trim();
+          return <DownloadExcelBlock key={index} content={jsonContent} />;
         }
         return <React.Fragment key={index}>{part}</React.Fragment>;
       })}
@@ -650,14 +745,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, file, o
         </div>
       )}
       <div className="relative flex items-end bg-gray-800 rounded-xl border border-gray-700 focus-within:ring-2 focus-within:ring-green-500 transition-all duration-200">
-        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".xlsx,.xls,.csv" disabled={isDisabled} />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept=".xlsx,.xls,.csv,.pdf,.docx" disabled={isDisabled} />
         <button onClick={handleFileButtonClick} disabled={isDisabled} className="p-2 ml-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50" aria-label="Attach file">
           <UploadIcon className="w-5 h-5" />
         </button>
         <button onClick={onToggleListening} disabled={isDisabled} className={`p-2 mb-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50 ${isListening ? 'text-red-500' : ''}`} aria-label={isListening ? "Stop listening" : "Start listening"}>
           <MicrophoneIcon className={`w-5 h-5 ${isListening ? 'animate-pulse' : ''}`} />
         </button>
-        <textarea ref={textareaRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder={!isApiKeySet ? "Please set your API key to begin..." : (isListening ? "Listening..." : "Ask anything about Excel, or upload a file...")} rows={1} className="w-full bg-transparent p-3 pr-12 text-gray-200 placeholder-gray-500 focus:outline-none resize-none max-h-48" disabled={isDisabled} />
+        <textarea ref={textareaRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder={!isApiKeySet ? "Please set your API key to begin..." : (isListening ? "Listening..." : "Ask about Excel, or upload a file (XLS, CSV, PDF, DOCX)...")} rows={1} className="w-full bg-transparent p-3 pr-12 text-gray-200 placeholder-gray-500 focus:outline-none resize-none max-h-48" disabled={isDisabled} />
         <button onClick={handleSubmit} disabled={isDisabled || (!text.trim() && !file)} className="absolute right-3 bottom-3 p-2 rounded-full bg-green-600 text-white disabled:bg-gray-600 disabled:cursor-not-allowed hover:bg-green-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50" aria-label="Send message">
           <SendIcon className="w-5 h-5" />
         </button>
@@ -805,6 +900,10 @@ const App: React.FC = () => {
         console.error("Failed to load conversations from localStorage", e);
         setError("Could not load your saved chat history.");
     }
+
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+    }
   }, []);
 
   useEffect(() => {
@@ -864,13 +963,40 @@ const App: React.FC = () => {
     if (file) {
       try {
         const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        if (!firstSheetName) throw new Error("The spreadsheet contains no sheets.");
-        const worksheet = workbook.Sheets[firstSheetName];
-        const fileContentAsCsv = XLSX.utils.sheet_to_csv(worksheet);
-        const userPrompt = messageText || "analise esta planilha e me dê um resumo dos dados.";
-        messageContent = `O conteúdo do arquivo '${file.name}' (em formato CSV) é:\n\n---\n${fileContentAsCsv}\n---\n\n${userPrompt}`;
+        const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+        let fileContentAsText = '';
+        
+        switch (fileExtension) {
+            case 'xlsx':
+            case 'xls':
+            case 'csv':
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                if (!firstSheetName) throw new Error("The spreadsheet contains no sheets.");
+                const worksheet = workbook.Sheets[firstSheetName];
+                fileContentAsText = XLSX.utils.sheet_to_csv(worksheet);
+                break;
+            case 'pdf':
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let pdfFullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    pdfFullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+                }
+                fileContentAsText = pdfFullText;
+                break;
+            case 'docx':
+                const docxResult = await mammoth.extractRawText({ arrayBuffer });
+                fileContentAsText = docxResult.value;
+                break;
+            default:
+                throw new Error(`Unsupported file type: .${fileExtension}`);
+        }
+
+        const userPrompt = messageText || "analise este documento e me dê um resumo dos dados, com foco em como eles poderiam ser usados ou representados no Excel.";
+        messageContent = `O conteúdo do arquivo '${file.name}' é:\n\n---\n${fileContentAsText}\n---\n\n${userPrompt}`;
+
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred while reading the file.';
         setError(`Failed to read the uploaded file: ${errorMessage}`);
